@@ -37,7 +37,7 @@ public class CustomFailedHandler implements AuthenticationFailureHandler {
 //        response.sendRedirect(loginUrl);
 
         String errorMessage = exception.getMessage(); // 실패 메시지
-        response.sendRedirect("http://localhost:5173/oauth2/LoginFailcallback?error=" + URLEncoder.encode(errorMessage, "UTF-8"));
+        response.sendRedirect("https://mercurystudy.store/oauth2/LoginFailcallback?error=" + URLEncoder.encode(errorMessage, "UTF-8"));
 
     }
 }

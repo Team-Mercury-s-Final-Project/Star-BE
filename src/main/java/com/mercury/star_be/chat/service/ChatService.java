@@ -65,5 +65,6 @@ public interface ChatService {
     //채팅목록으로 채팅방의 최신 메시지 전달
     ChatRecentMessageResponse sendRecentMessageToChatList(ChatRecentMessageRequest request);
     boolean isReadCheck(ChatReadRequest request);
-    void deleteUSerChatRoom(Long groupId, Long userId);
+    //사용자 채팅방 삭제
+    public void deleteUSerChatRoom(Long groupId, Long userId);
 }

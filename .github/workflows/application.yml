@@ -109,4 +109,4 @@ jobs:
             sudo docker stop $(sudo docker ps -a | grep star-be | awk '{print $1}') || true
             sudo docker rm $(sudo docker ps -a | grep star-be | awk '{print $1}') || true
             sudo docker pull mafatofu/star-be
-            sudo docker run -d -p 8080:8080 --name star-be mafatofu/star-be
+            sudo docker run -d -p 8080:8080 --name star-be -e TZ=Asia/Seoul mafatofu/star-be

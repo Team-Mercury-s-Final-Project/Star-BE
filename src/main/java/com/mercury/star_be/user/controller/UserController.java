@@ -68,10 +68,18 @@ public class UserController {
     }
 
 
+    //@GetMapping("/api/check-auth")
+   // public ResponseEntity<String> checkAuth(Authentication auth) {
+     //   if (JwtUtil.getAuthenticatedUser(auth) != null) {
+     //       return ResponseEntity.status(200).body("Authenticated");
+     //   }
+    //    throw new CustomAuthenticationException(AuthenticationErrorCode.MISSING_ACCESSTOKEN);
+   // }
     @GetMapping("/api/check-auth")
     public ResponseEntity<String> checkAuth(Authentication auth) {
             return ResponseEntity.status(200).body("Authenticated");
     }
+  
 
 
     /** 유저 정보 조회 **/

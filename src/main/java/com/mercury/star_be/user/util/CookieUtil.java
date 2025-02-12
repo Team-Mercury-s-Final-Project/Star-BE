@@ -10,13 +10,16 @@ public class CookieUtil {
     public final static int REFRESH_COOKIE_EXPIRATION = 60 * 60 * 24;
 
     public static ResponseCookie createCookie(String key, String value, Integer expiredS) {
-
+        
         ResponseCookie cookie = ResponseCookie.from(key, value)
-                //.httpOnly(true) // HttpOnly 속성 설정
-                .path("/") // 모든 경로에 쿠키를 포함
-                .maxAge(expiredS) // 1시간 유효기간 설정
-                .sameSite("Lax") // CSRF 방지용
+            // .httpOnly(true)
+                .domain(".mercurystudy.store")
+                .secure(true)  // HTTPS 연결에서만 전송
+                .path("/")
+                .maxAge(expiredS) 
+                .sameSite("None") // 반드시 "None" 설정 필요
                 .build();
+
         return  cookie;
 
 //        Cookie cookie = new Cookie(key, value);

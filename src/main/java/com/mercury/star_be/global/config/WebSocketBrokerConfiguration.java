@@ -30,12 +30,12 @@ public class WebSocketBrokerConfiguration implements WebSocketMessageBrokerConfi
         // 웹소켓 연결 요청 엔드포인트
         // ws://localhost:8080/chat/
         registry.addEndpoint("/chat")
-                .setAllowedOrigins("http://localhost:5173", "https://34.22.98.26:3001", "https://34.22.98.26:5173", "https://mercurystar.duckdns.org");
+                .setAllowedOrigins("http://localhost:5173", "https://mercurystudy.store");
 
         // 웹소켓 연결 요청 엔드포인트
         // ws://localhost:8080/timer/
         registry.addEndpoint("/timer")
-                .setAllowedOrigins("http://localhost:5173", "https://34.22.98.26:3001", "https://34.22.98.26:5173", "https://mercurystar.duckdns.org");
+                .setAllowedOrigins("http://localhost:5173", "https://mercurystudy.store");
     }
 
     @Override

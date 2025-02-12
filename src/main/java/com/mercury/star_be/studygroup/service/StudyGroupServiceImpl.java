@@ -273,6 +273,9 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 		groupMemberRepository.deleteByGroupIdAndMemberId(studyGroup.getId(), userId);
 		// 그룹의 멤버 카운트 감소
 		studyGroup.decrementMemberCount();
+
+		// 사용자 채팅방 삭제
+		chatService.deleteUSerChatRoom(groupId, userId);
 	}
 
 	@Override
@@ -287,6 +290,9 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 			// 그룹 멤버 관계 삭제
 			groupMemberRepository.deleteByGroupIdAndMemberId(groupId, userId);
 			studyGroup.decrementMemberCount();
+
+			// 사용자 채팅방 삭제
+			chatService.deleteUSerChatRoom(groupId, userId);
 		}
 	}
 

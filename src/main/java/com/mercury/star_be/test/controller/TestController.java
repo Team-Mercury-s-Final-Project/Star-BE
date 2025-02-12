@@ -20,4 +20,10 @@ public class TestController {
     ){
         System.out.println("result ::: -----" + message + "-----");
     }
+    //상태체크
+    @GetMapping("/healthcheck")
+    public ResponseEntity<String> healthCheck() {
+        return ResponseEntity.ok("OK");
+    }
+    
 }

@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -107,12 +106,12 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
                             .image(oauth2Response.getImage())
                             .oauthId(oauthId)
                             .build();
-                    return (UserResponse) userRepository.save(user);
+                    User savedUser = userRepository.save(user);
+                    return new UserResponse(savedUser);
                 });
         if (!existData.isActive()) {
             throw new CustomAuthenticationException(USER_DEACTIVATED);  // throw new AuthenticationException(USER_DEACTIVATED.getMessage()
         }
-        ;
 
         return new UserResponse(existData);
     }
