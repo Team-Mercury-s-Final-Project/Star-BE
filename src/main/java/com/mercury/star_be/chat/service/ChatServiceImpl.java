@@ -849,6 +849,18 @@ public class ChatServiceImpl implements ChatService {
     public boolean isReadCheck(ChatReadRequest request) {
         return chatReadRepository.existsByChatMessageIdAndChatUserId(request.getChatMessageId(), request.getChatUserId());
     }
+    /**
+     * 사용자 채팅방 삭제
+     * 그룹 탈퇴 시 사용자가 해당 그룹의 채팅방에서도 탈퇴
+     * */
+    @Override
+    @Transactional
+    public void deleteUSerChatRoom(Long groupId, Long userId) {
+
+       ChatRoom chatRoom = findByGroupId(groupId);
+       UserChatRoom userChatRoom = userChatRoomRepository.findByChatRoomIdAndChatUserId(chatRoom.getId(), userId);
+       userChatRoomRepository.delete(userChatRoom);
+    }
 
     public ChatMessage findChatMessage(Long chatMessageId) {
         return chatMessageRepository.findById(chatMessageId).orElseThrow(
