@@ -594,7 +594,7 @@ public class ChatServiceImpl implements ChatService {
             for (GroupMember groupMember : chatRoom.getStudyGroup().getMembers()) {
                 ChatRoomMemberDto chatRoomMemberDto = ChatRoomMemberDto.builder()
                         .id(groupMember.getMember().getId())
-                        .nickName(groupMember.getMember().getNickname())
+                        .nickName(groupMember.getNickname())
                         .profileImg(groupMember.getMember().getImage())
                         .build();
                 chatRoomMembers.add(chatRoomMemberDto);
