@@ -594,7 +594,7 @@ public class ChatServiceImpl implements ChatService {
             for (GroupMember groupMember : chatRoom.getStudyGroup().getMembers()) {
                 ChatRoomMemberDto chatRoomMemberDto = ChatRoomMemberDto.builder()
                         .id(groupMember.getMember().getId())
-                        .nickName(groupMember.getNickname())
+                        .nickName(groupMember.getMember().getNickname())
                         .profileImg(groupMember.getMember().getImage())
                         .build();
                 chatRoomMembers.add(chatRoomMemberDto);
@@ -610,19 +610,39 @@ public class ChatServiceImpl implements ChatService {
      * */
     @Override
     @Transactional
-    public void updateReadCount(ChatReadRequest chatReadRequest, Long chatRoomId) {
-        // 메시지 읽음 처리 요청을 큐에 추가
-        try {
-            String messageJson = objectMapper.writeValueAsString(chatReadRequest);
-            messagingTemplate
-                    .convertAndSend("readCheck.exchange", "readCheck.request." + chatRoomId, messageJson);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new BusinessException(ChatErrorCode.CHAT_MESSAGE_CONVERT_ERROR);
-        } catch (AmqpException e) {
-            e.printStackTrace();
-            throw new BusinessException(ChatErrorCode.MESSAGE_SENDING_ERROR);
+    public ChatReadResponse updateReadCount(ChatReadRequest chatReadRequest, Long chatRoomId) {
+
+        //특정 유저가 채팅메시지를 읽었는지 확인
+        boolean isRead = chatReadRepository.
+                existsByChatMessageIdAndChatUserId(chatReadRequest.getChatMessageId(), chatReadRequest.getChatUserId());
+        //이미 읽었었다면 end
+        if (isRead) {
+            throw new BusinessException(ChatErrorCode.CHAT_ALREADY_READ);
         }
+
+        ChatMessage chatMessage = chatMessageRepository.findById(chatReadRequest.getChatMessageId()).orElseThrow(
+                () -> new BusinessException(ChatErrorCode.CHAT_MESSAGE_NOT_FOUND)
+        );
+
+        if (chatMessage.getUnreadCount() > 0) {
+            chatMessage.updateUnreadCount(chatMessage.getUnreadCount() - 1);
+        }
+
+        User chatUser = userRepository.findById(chatReadRequest.getChatUserId()).orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_EXIST));
+        ChatRead chatRead = ChatRead.builder()
+                .chatUser(chatUser)
+                .chatMessage(chatMessage)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        chatReadRepository.save(chatRead);
+
+        ChatReadResponse response = ChatReadResponse.builder()
+                .chatMessageId(chatMessage.getId())
+                .unreadCount(chatMessage.getUnreadCount())
+                .build();
+
+        return response;
     }
 
     @Override
@@ -861,18 +881,6 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public boolean isReadCheck(ChatReadRequest request) {
         return chatReadRepository.existsByChatMessageIdAndChatUserId(request.getChatMessageId(), request.getChatUserId());
-    }
-    /**
-     * 사용자 채팅방 삭제
-     * 그룹 탈퇴 시 사용자가 해당 그룹의 채팅방에서도 탈퇴
-     * */
-    @Override
-    @Transactional
-    public void deleteUSerChatRoom(Long groupId, Long userId) {
-
-       ChatRoom chatRoom = findByGroupId(groupId);
-       UserChatRoom userChatRoom = userChatRoomRepository.findByChatRoomIdAndChatUserId(chatRoom.getId(), userId);
-       userChatRoomRepository.delete(userChatRoom);
     }
 
     public ChatMessage findChatMessage(Long chatMessageId) {

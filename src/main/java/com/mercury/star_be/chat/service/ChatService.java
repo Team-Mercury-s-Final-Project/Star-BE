@@ -39,7 +39,7 @@ public interface ChatService {
     //채팅방 id를 받아 List<ChatRoomMemberDto>로 return
     List<ChatRoomMemberDto> getChatRoomMembers(ChatRoom chatRoom);
     //읽음 update
-    void updateReadCount(ChatReadRequest chatReadRequest, Long chatRoomId);
+    ChatReadResponse updateReadCount(ChatReadRequest chatReadRequest, Long chatRoomId);
     //사용자가 채팅방에서 읽지 않은 메시지들의 아이디 리스트
     List<Long> findUnreadMessageIds(Long chatRoomId, Long userId);
     //읽지 않은 메시지들의 아이디 리스트를 받아  메시지 읽음 테이블에 insert / 메시지 테이블에 update

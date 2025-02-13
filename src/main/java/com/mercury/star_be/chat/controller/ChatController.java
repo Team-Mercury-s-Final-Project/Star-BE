@@ -112,13 +112,14 @@ public class ChatController {
 
     /**채팅방 내 메시지 읽음 udpate 컨트롤러*/
     @MessageMapping("/readCheck/{chatRoomId}")
-    @SendTo("/topic/readCheck.{chatRoomId}")
-    public void updateReadUsers(
+    @SendTo("/topic/readCheck.response.{chatRoomId}")
+    public ApiResponse<ChatReadResponse> updateReadUsers(
             @DestinationVariable
             Long chatRoomId,
             @Payload ChatReadRequest chatReadRequest
     ){
-        chatService.updateReadCount(chatReadRequest, chatRoomId);
+        ChatReadResponse response = chatService.updateReadCount(chatReadRequest, chatRoomId);
+        return ApiResponse.success(response);
     }
     /**현재 접속한 사용자 반환*/
     @MessageMapping("/chat/connect/{chatRoomId}")
