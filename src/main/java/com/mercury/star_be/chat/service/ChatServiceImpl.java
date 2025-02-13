@@ -594,7 +594,7 @@ public class ChatServiceImpl implements ChatService {
             for (GroupMember groupMember : chatRoom.getStudyGroup().getMembers()) {
                 ChatRoomMemberDto chatRoomMemberDto = ChatRoomMemberDto.builder()
                         .id(groupMember.getMember().getId())
-                        .nickName(groupMember.getMember().getNickname())
+                        .nickName(groupMember.getNickname())
                         .profileImg(groupMember.getMember().getImage())
                         .build();
                 chatRoomMembers.add(chatRoomMemberDto);
@@ -649,31 +649,6 @@ public class ChatServiceImpl implements ChatService {
     public List<Long> findUnreadMessageIds(Long chatRoomId, Long userId) {
         return chatCustomRepository.findUnreadMessageIds(chatRoomId, userId);
     }
-    /**읽지 않은 메시지들의 읽음처리 / 읽지 않은 사람 수 update 서비스*/
-//    @Override
-//    @Transactional
-//    public void updateAndInsertChatReadsAnother(Long userId, Long chatRoomId) {
-//        List<Long> findUnreadMessageIds = findUnreadMessageIds(chatRoomId, userId);
-//        //바꿀게 없으면 pass
-//        if (!findUnreadMessageIds.isEmpty()) {
-//            //insertUnreadMessagesToChatRead
-//            insertChatReads(request, userId);
-//            updateChatReads(request);
-//            //해당 채팅방을 구독하고 있는 사람들에게, 메시지들이 읽음처리 되었음을 rabbitmq로 알림.
-//            try {
-//                //현재 채팅방의 메시지 읽음처리된 id list만 보내야함
-//                String messageJson = objectMapper.writeValueAsString(request);
-//                messagingTemplate
-//                        .convertAndSend(READ_CHECK_EXCHANGE_NAME, READ_CHECK_BULK_RESPONSE_ROUTING_KEY + chatRoomId, messageJson);
-//            } catch (JsonProcessingException e) {
-//                e.printStackTrace();
-//                throw new BusinessException(ChatErrorCode.CHAT_MESSAGE_CONVERT_ERROR);
-//            } catch (AmqpException e) {
-//                e.printStackTrace();
-//                throw new BusinessException(ChatErrorCode.MESSAGE_SENDING_ERROR);
-//            }
-//        }
-//    }
 
     /**읽지 않은 메시지들의 읽음처리 / 읽지 않은 사람 수 update 서비스*/
     @Override
