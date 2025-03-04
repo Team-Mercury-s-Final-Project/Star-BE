@@ -6,11 +6,15 @@ import com.mercury.star_be.chat.entity.ChatRoom;
 import com.mercury.star_be.chat.service.ChatService;
 import com.mercury.star_be.global.common.ApiResponse;
 import com.mercury.star_be.user.dto.response.UserResponse;
+import com.mercury.star_be.user.entity.User;
+import com.mercury.star_be.user.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChatController {
 
     private final ChatService chatService;
+    private final SimpMessagingTemplate messagingTemplate;
     /**
      * 채팅방 조회 컨트롤러
      * */
@@ -100,19 +105,24 @@ public class ChatController {
         return ApiResponse.success(chatMessageResponse);
     }
 
-    /**채팅목록으로 최신 메시지 전달 컨트롤러*/
+    /**
+     * 채팅목록으로 최신 메시지 전달 컨트롤러
+     * 각 채팅방의 최신 메시지를 현재 사용자에게 전달
+     * */
     @MessageMapping("/chat/sendRecentMessageToChatList/{chatRoomId}")
-    @SendTo("/topic/chat.recentMessage.{chatRoomId}")
-    public ApiResponse<ChatRecentMessageResponse> sendRecentMessageToChatList(
-            @Payload ChatRecentMessageRequest chatRecentMessageRequest
+    public void sendRecentMessageToChatList(
+            @Payload ChatRecentMessageRequest chatRecentMessageRequest,
+            Authentication auth
     ){
+        Long userId = JwtUtil.getAuthenticatedUser(auth).getId();
         ChatRecentMessageResponse response = chatService.sendRecentMessageToChatList(chatRecentMessageRequest);
-        return ApiResponse.success(response);
+        //내가 그 방을 구독하고 있는지 체크해야하는가?
+        messagingTemplate.convertAndSend("/topic/chatList." + userId, response);
     }
 
     /**채팅방 내 메시지 읽음 udpate 컨트롤러*/
     @MessageMapping("/readCheck/{chatRoomId}")
-    @SendTo("/topic/readCheck.{chatRoomId}")
+    @SendTo("/topic/chat.{chatRoomId}")
     public ApiResponse<ChatReadResponse> updateReadUsers(
             @DestinationVariable
             Long chatRoomId,
@@ -123,7 +133,7 @@ public class ChatController {
     }
     /**현재 접속한 사용자 반환*/
     @MessageMapping("/chat/connect/{chatRoomId}")
-    @SendTo("/topic/chat.connect.{chatRoomId}")
+    @SendTo("/topic/chat.{chatRoomId}")
     public ApiResponse<ChatRoomConnectedUserResponse> chatRoomConnect(
             @DestinationVariable Long chatRoomId,
             @Payload ChatRoomConnectedUserRequest request
@@ -133,7 +143,7 @@ public class ChatController {
     }
     /**현재 접속 해제한 사용자 반환*/
     @MessageMapping("/chat/disconnect/{chatRoomId}")
-    @SendTo("/topic/chat.disconnect.{chatRoomId}")
+    @SendTo("/topic/chat.{chatRoomId}")
     public ApiResponse<ChatRoomConnectedUserResponse> chatRoomDisconnect(
             @DestinationVariable Long chatRoomId,
             @Payload ChatRoomConnectedUserRequest request

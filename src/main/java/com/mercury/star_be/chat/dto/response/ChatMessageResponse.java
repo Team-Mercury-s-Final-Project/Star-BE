@@ -1,5 +1,6 @@
 package com.mercury.star_be.chat.dto.response;
 
+import com.mercury.star_be.chat.dto.common.ChatEvent;
 import com.mercury.star_be.chat.dto.common.ChatMessageFileDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,4 +22,5 @@ public class ChatMessageResponse {
     private String profileImgUrl;
     private Long senderId;
     List<ChatMessageFileDto> messageFiles;
+    private ChatEvent event;
 }

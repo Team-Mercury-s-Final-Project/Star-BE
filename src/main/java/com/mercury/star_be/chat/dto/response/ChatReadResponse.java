@@ -1,5 +1,6 @@
 package com.mercury.star_be.chat.dto.response;
 
+import com.mercury.star_be.chat.dto.common.ChatEvent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,4 +11,5 @@ import lombok.Getter;
 public class ChatReadResponse {
     private Long chatMessageId;
     private int unreadCount;
+    private ChatEvent event;
 }

@@ -1,5 +1,6 @@
 package com.mercury.star_be.chat.dto.response;
 
+import com.mercury.star_be.chat.dto.common.ChatEvent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,5 +19,5 @@ public class ChatRecentMessageResponse {
     private String profileImgUrl;
     private String content;
     private LocalDateTime createdAt;
-
+    private ChatEvent event;
 }

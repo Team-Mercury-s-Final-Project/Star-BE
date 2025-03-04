@@ -1,5 +1,6 @@
 package com.mercury.star_be.chat.dto.response;
 
+import com.mercury.star_be.chat.dto.common.ChatEvent;
 import com.mercury.star_be.chat.dto.request.ChatRoomConnectedUserRequest;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,5 +18,5 @@ import java.util.Set;
 public class ChatRoomConnectedUserResponse {
 
     private Set<String> connectedMemberIds = new HashSet<>();
-
+    private ChatEvent event;
 }

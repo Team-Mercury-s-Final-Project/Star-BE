@@ -23,9 +23,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitMessagingTemplate;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -52,7 +51,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatCustomRepository chatCustomRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final StudyGroupSseService studyGroupSseService;
-
+    private final RabbitTemplate rabbitTemplate;
 
     /**
      * 채팅방 조회
@@ -210,6 +209,9 @@ public class ChatServiceImpl implements ChatService {
         User chatSender = userRepository.findById(chatMessageRequest.getSenderId())
                 .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_EXIST));
 
+        //채팅이벤트 분기(메시지 / 파일)
+        ChatEvent event = ChatEvent.SEND_TEXT_MESSAGE;
+
         // 읽지 않은 사람 수
         int unreadCount = 2;
         if (chatRoom.getChatRoomType() == ChatRoomType.GROUP) {
@@ -228,7 +230,6 @@ public class ChatServiceImpl implements ChatService {
                 .build();
 
         // DM일 경우 수신자 추가
-// DM일 경우 수신자 추가
         if (chatMessageRequest.getChatRoomType().equals(ChatRoomType.DM)) {
             // receiver가 없다면...
             Long tempReceiverId = 0L;
@@ -271,6 +272,8 @@ public class ChatServiceImpl implements ChatService {
             //파일url로 메시지 내용 변경
             chatMessage.fileUploadContentString(fileUrls.toString());
             chatMessageRequest.fileUploadContentString(fileUrls.toString());
+            //채팅이벤트 분기(메시지 / 파일)
+            event = ChatEvent.SEND_FILE_MESSAGE;
         }
         // 파일 업데이트 및 저장
         chatMessage.updateFiles(chatMessageFiles);
@@ -286,33 +289,37 @@ public class ChatServiceImpl implements ChatService {
                 .profileImgUrl(chatSender.getImage())
                 .senderId(chatSender.getId())
                 .messageFiles(chatMessageRequest.getMessageFiles()) // 파일 정보 추가
+                .event(event)
                 .build();
 
-        //채팅목록으로 새로운 메시지 전달
-        try {
-            ChatRecentMessageDto dto = ChatRecentMessageDto.builder()
-                    .id(response.getId())
-                    .nickName(response.getNickName())
-                    .profileImgUrl(response.getProfileImgUrl())
-                    .content(response.getMessageContent())
-                    .createdAt(response.getCreatedAt())
-                    .userId(chatSender.getId())
-                    .build();
-
-            String messageJson = objectMapper.writeValueAsString(dto);
-            messagingTemplate
-                    .convertAndSend(
-                            CHAT_EXCHANGE_NAME,
-                            CHAT_RECENT_MESSAGE_ROUTING_KEY + chatSender.getId(),
-                            messageJson
-                    );
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new BusinessException(ChatErrorCode.CHAT_MESSAGE_CONVERT_ERROR);
-        } catch (AmqpException e) {
-            e.printStackTrace();
-            throw new BusinessException(ChatErrorCode.MESSAGE_SENDING_ERROR);
-        }
+        //채팅방과 채팅목록으로 새로운 메시지 전달
+//        try {
+//            //채팅목록으로 전달
+//            ChatRecentMessageDto dto = ChatRecentMessageDto.builder()
+//                    .id(response.getId())
+//                    .nickName(response.getNickName())
+//                    .profileImgUrl(response.getProfileImgUrl())
+//                    .content(response.getMessageContent())
+//                    .createdAt(response.getCreatedAt())
+//                    .userId(chatSender.getId())
+//                    .build();
+//
+//            String messageJson = objectMapper.writeValueAsString(dto);
+//            rabbitTemplate
+//                    .convertAndSend(
+//                            CHAT_EXCHANGE_NAME,
+//                            CHAT_RECENT_MESSAGE_ROUTING_KEY + chatSender.getId(),
+//                            messageJson
+//                    );
+//        } catch (JsonProcessingException e) {
+//            e.printStackTrace();
+//            throw new BusinessException(ChatErrorCode.CHAT_MESSAGE_CONVERT_ERROR);
+//        } catch (AmqpException e) {
+//            e.printStackTrace();
+//            throw new BusinessException(ChatErrorCode.MESSAGE_SENDING_ERROR);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
         return response;
     }
 
@@ -685,6 +692,7 @@ public class ChatServiceImpl implements ChatService {
         ChatReadResponse response = ChatReadResponse.builder()
                 .chatMessageId(chatMessage.getId())
                 .unreadCount(chatMessage.getUnreadCount())
+                .event(ChatEvent.READ_CHECK)
                 .build();
         return response;
     }
@@ -851,6 +859,7 @@ public class ChatServiceImpl implements ChatService {
         // return
         return ChatRoomConnectedUserResponse.builder()
                 .connectedMemberIds(connectedMembers)
+                .event(ChatEvent.CONNECT)
                 .build();
     }
 
@@ -877,6 +886,7 @@ public class ChatServiceImpl implements ChatService {
         // return
         return ChatRoomConnectedUserResponse.builder()
                 .connectedMemberIds(connectedMembers)
+                .event(ChatEvent.DISCONNECT)
                 .build();
     }
 
@@ -912,6 +922,7 @@ public class ChatServiceImpl implements ChatService {
                 .profileImgUrl(request.getProfileImgUrl())
                 .content(request.getContent())
                 .createdAt(LocalDateTime.now())
+                .event(ChatEvent.SEND_RECENT_MESSAGE_TO_CHAT_LIST)
                 .build();
         return response;
     }
