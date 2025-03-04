@@ -3,14 +3,18 @@ package com.mercury.star_be.chat.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mercury.star_be.chat.dto.common.ChatRabbitPayload;
 import com.mercury.star_be.chat.dto.common.ChatRecentMessageDto;
 import com.mercury.star_be.chat.dto.request.ChatReadRequest;
 import com.mercury.star_be.chat.dto.request.ChatUpdateReadMessagesRequest;
+import com.mercury.star_be.chat.dto.response.ChatMessageResponse;
 import com.mercury.star_be.chat.dto.response.ChatReadResponse;
 import com.mercury.star_be.chat.entity.ChatMessage;
 import com.mercury.star_be.chat.entity.ChatRead;
 import com.mercury.star_be.chat.repository.ChatMessageRepository;
 import com.mercury.star_be.chat.repository.ChatReadRepository;
+import com.mercury.star_be.global.common.ApiResponse;
+import com.mercury.star_be.global.config.RabbitMQConfig;
 import com.mercury.star_be.global.error.BusinessException;
 import com.mercury.star_be.global.error.code.ChatErrorCode;
 import com.mercury.star_be.global.error.code.UserErrorCode;
@@ -19,7 +23,6 @@ import com.mercury.star_be.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -27,24 +30,38 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-import static com.mercury.star_be.global.config.RabbitMQConfig.CHAT_RECENT_MESSAGE_QUEUE_NAME;
-import static com.mercury.star_be.global.config.RabbitMQConfig.READ_CHECK_BULK_RESPONSE_QUEUE_NAME;
+import static com.mercury.star_be.global.config.RabbitMQConfig.*;
 
 @Service
 @RequiredArgsConstructor
-public class RabbitMQListener {
+public class ChatRabbitMQListener {
 
     private final ChatReadRepository chatReadRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatMessageRepository chatMessageRepository;
+    private final RabbitTemplate rabbitTemplate;
 
     /**
-     * 채팅방 접속자 구독 체크
-     * 채팅방의 사람이 해당 큐를 구독중인지를 체크함
+     * 채팅방으로 메시지 전송
      * */
-
+    @RabbitListener(queues = "chat.queue")
+    public void sendMessage(String messageJson) {
+        System.out.println(messageJson);
+        try {
+            ChatRabbitPayload payload = objectMapper.readValue(messageJson, ChatRabbitPayload.class);
+            ChatMessageResponse response = objectMapper.convertValue(payload.getObject(), ChatMessageResponse.class);
+            Long chatRoomId = payload.getChatRoomId();
+            messagingTemplate.convertAndSend("/topic/chat." + chatRoomId, ApiResponse.success(response));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            throw new BusinessException(ChatErrorCode.CHAT_MESSAGE_CONVERT_ERROR);
+        } catch (MessagingException e) {
+            e.printStackTrace();
+            throw new BusinessException(ChatErrorCode.MESSAGE_SENDING_ERROR);
+        }
+    }
     /**
      * 채팅방의 메시지를 채팅목록의 최신 메시지로 보냄
      * */
