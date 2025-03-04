@@ -54,6 +54,10 @@ public class RabbitMQConfig {
     private static final String TIMER_EXCHANGE_NAME = "groups.exchange";
     private static final String TIMER_ROUTING_KEY = "groups.#";
 
+    // SSE
+    public static final String SSE_EXCHANGE_NAME = "sse.exchange";
+    private static final String SSE_QUEUE_NAME = "sse.queue.";
+
 
     //Queue 등록(채팅 / 메시지 읽음)
     //채팅 큐
@@ -91,6 +95,16 @@ public class RabbitMQConfig {
         return new Queue(TIMER_QUEUE_NAME,true);
     }
 
+    // SSE Queue 등록
+    @Bean
+    public Queue sseQueue() {
+        String instanceName = System.getenv("INSTANCE_NAME");
+        if (instanceName == null) {
+            instanceName = "local";
+        }
+        return new Queue(SSE_QUEUE_NAME + instanceName, true);
+    }
+
     //Exchange 등록
     @Bean
     public TopicExchange chatExchange(){ return new TopicExchange(CHAT_EXCHANGE_NAME); }
@@ -101,6 +115,12 @@ public class RabbitMQConfig {
     @Bean
     public TopicExchange timerExchange() {
         return new TopicExchange(TIMER_EXCHANGE_NAME);
+    }
+
+    // SSE Exchange 등록
+    @Bean
+    public FanoutExchange sseExchange() {
+        return new FanoutExchange(SSE_EXCHANGE_NAME);
     }
 
     //Exchange와 Queue 바인딩
@@ -145,6 +165,12 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(timerQueue).to(timerExchange).with(TIMER_ROUTING_KEY);
     }
 
+
+    // SSE Exchange와 Queue 바인딩
+    @Bean
+    public Binding statusBinding(Queue sseQueue, FanoutExchange sseExchange) {
+        return BindingBuilder.bind(sseQueue).to(sseExchange);
+    }
 
     /* messageConverter를 커스터마이징 하기 위해 Bean 새로 등록 */
     @Bean

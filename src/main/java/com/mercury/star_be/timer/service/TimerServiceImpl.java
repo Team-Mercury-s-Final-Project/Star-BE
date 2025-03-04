@@ -115,7 +115,8 @@ public class TimerServiceImpl implements TimerService {
                 TimerDto timerDto = new TimerDto(timer);
                 timerDto.setEvent(TimerEvent.ENTRY);
                 timerDto.setNickname(entry.getValue());
-                timerDto.setTimeSoFar(timer.getCalculatedTimeSoFarWhenStatusIsStart());
+                // start인 타이머를 현재 시각 기준으로 계산했을 때의 시간
+                timerDto.setCurrentTimeSoFar(timer);
                 timerData.add(timerDto);
             }
         }

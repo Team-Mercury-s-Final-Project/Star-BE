@@ -7,6 +7,9 @@ import com.mercury.star_be.global.error.CustomAuthenticationException;
 import com.mercury.star_be.global.error.code.AuthenticationErrorCode;
 import com.mercury.star_be.global.error.code.UserErrorCode;
 import com.mercury.star_be.studygroup.dto.request.GroupLeaveRequest;
+import com.mercury.star_be.studygroup.dto.response.GroupMembeResponse;
+import com.mercury.star_be.studygroup.dto.response.MyStudyGroupListResponse;
+import com.mercury.star_be.studygroup.repository.GroupMemberRepository;
 import com.mercury.star_be.studygroup.service.StudyGroupService;
 import com.mercury.star_be.user.Handler.CustomSuccessHandler;
 import com.mercury.star_be.user.dto.request.UserRequest;
@@ -15,12 +18,14 @@ import com.mercury.star_be.user.entity.RefreshToken;
 import com.mercury.star_be.user.entity.User;
 import com.mercury.star_be.user.repository.RefreshRepository;
 import com.mercury.star_be.user.repository.UserRepository;
+import com.mercury.star_be.user.util.CookieUtil;
 import com.mercury.star_be.user.util.JwtUtil;
 import jakarta.persistence.EntityManager;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -32,10 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.mercury.star_be.global.error.code.AuthenticationErrorCode.USER_DEACTIVATED;
 
@@ -48,8 +51,9 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
     private final FileService gcsFileService;
     private final StudyGroupService studyGroupService;
     private final RefreshRepository refreshRepository;
-    private final CustomSuccessHandler customSuccessHandler;
+    private final GroupMemberRepository groupMemberRepository;
     private final EntityManager entityManager;
+    private final CustomSuccessHandler customSuccessHandler;
 
     @Override
     public UserResponse createUser(UserRequest userRequest) {
@@ -65,6 +69,9 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
         return new UserResponse(savedUser);
     }
 
+    /**
+     * oauth 로그인
+     */
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
 
@@ -137,6 +144,63 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
     }
 
     @Override
+    public List<Map<String, Object>> getUserJoinedInfo(Long userId) {
+        List<Map<String, Object>> groupList = new ArrayList<>();
+        List<MyStudyGroupListResponse> myStudyGroupList = studyGroupService.getMyStudyGroupList(userId);
+
+        for (MyStudyGroupListResponse myStudyGroup : myStudyGroupList) {
+            Map<String, Object> groupInfoMap = new HashMap<>();
+
+            // DTO로 매핑 로직 수정
+            List<GroupMembeResponse> groupMemberDTOs = groupMemberRepository.findByGroupIdOrderByJoinedAtAsc(myStudyGroup.getId())
+                    .stream()
+                    .map(GroupMembeResponse::new)  // 생성자 참조로 수정
+                    .collect(Collectors.toList());
+
+            if (groupMemberDTOs.size() > 1) {  // size가 1이 아닌 경우에 대한 조건 수정
+                // 내가 방장 O  & 사람들 있음
+                if (groupMemberDTOs.stream().anyMatch(user -> user.isHost() && Objects.equals(user.getMemberId(), userId))) {
+                    // if (Objects.equals(groupMemberDTOs.get(0).getMemberId(), userId)) {
+                    groupInfoMap.put("nickname", groupMemberDTOs.get(0).getNickname());
+                    groupInfoMap.put("groupId", myStudyGroup.getId());
+                    groupInfoMap.put("name", myStudyGroup.getName());
+                    groupInfoMap.put("imageUrl", myStudyGroup.getImageUrl());
+                    groupInfoMap.put("members", groupMemberDTOs);
+                    groupInfoMap.put("selectedMembers", groupMemberDTOs.get(1));  // 두 번째 멤버
+                    groupInfoMap.put("isHost", "1");
+                } else {
+                    // 내가 방장 X  & 사람들 있음
+
+                    String nickname = null;
+                    for (GroupMembeResponse groupMemberDTO : groupMemberDTOs) {
+                        if (Objects.equals(groupMemberDTO.getMemberId(), userId)) {
+                            nickname = groupMemberDTO.getNickname();
+                            break;  // 첫 번째로 일치하는 값 찾으면 루프 종료
+                        }
+                    }
+                    groupInfoMap.put("nickname", nickname);
+                    groupInfoMap.put("groupId", myStudyGroup.getId());
+                    groupInfoMap.put("name", myStudyGroup.getName());
+                    groupInfoMap.put("imageUrl", myStudyGroup.getImageUrl());
+                    groupInfoMap.put("members", groupMemberDTOs);
+                    groupInfoMap.put("isHost", "0");
+                }
+            } else { // 나 혼자 있는 방
+                groupInfoMap.put("nickname", groupMemberDTOs.get(0).getNickname());
+                groupInfoMap.put("groupId", myStudyGroup.getId());
+                groupInfoMap.put("name", myStudyGroup.getName());
+                groupInfoMap.put("imageUrl", myStudyGroup.getImageUrl());
+                groupInfoMap.put("isHost", "1");
+            }
+            groupList.add(groupInfoMap);
+        }
+        return groupList;
+    }
+
+    /**
+     * 유저 정보 변경
+     */
+    @Override
     @Transactional
     public void updateUserInfo(Authentication auth, String nickname, MultipartFile profileImg) throws IOException {
 
@@ -156,6 +220,9 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
         userRepository.save(user);
     }
 
+    /**
+     * 유저 정보 삭제 (실제로는 active = 0 수정)
+     */
     @Override
     @Transactional
     public void deleteUserInfo(Long userId) {
@@ -166,16 +233,18 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
     }
 
 
-
+    /**
+     * 유저 그룹 탈퇴
+     */
     @Override
     @Transactional
     public void exituserJoinGroup(GroupLeaveRequest request, HttpServletRequest httpServletReq, Authentication auth) {
 
         // 그룹장 위임
         User user = JwtUtil.getAuthenticatedUser(auth);
-        List<GroupLeaveRequest.GroupMemberInfo> GroupLeaveRequestList = request .getGroupMemberInfos();
-        if(!GroupLeaveRequestList.isEmpty()) {
-            for(GroupLeaveRequest.GroupMemberInfo GroupAndMemberInfo: GroupLeaveRequestList) {
+        List<GroupLeaveRequest.GroupMemberInfo> GroupLeaveRequestList = request.getGroupMemberInfos();
+        if (!GroupLeaveRequestList.isEmpty()) {
+            for (GroupLeaveRequest.GroupMemberInfo GroupAndMemberInfo : GroupLeaveRequestList) {
                 studyGroupService.selectHost(GroupAndMemberInfo.getGroupId(), GroupAndMemberInfo.getMemberId());
             }
         }
@@ -184,16 +253,16 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
     }
 
 
-
-
-
+    /**
+     * 유저 토큰 재 발행
+     */
     @Override
     public boolean reissue(HttpServletRequest req, HttpServletResponse res, Authentication auth) throws ServletException, IOException {
         String accessToken = jwtUtil.getJwt(req);
         Long userId = jwtUtil.getId(accessToken);
         RefreshToken refreshToken = refreshRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new CustomAuthenticationException(AuthenticationErrorCode.MISSING_REFRESGTOKEN));
-        boolean  test = (refreshToken.getExpiredAt()).after(new Date());
+        boolean test = (refreshToken.getExpiredAt()).after(new Date());
         if (test) {
             jwtUtil.createAuthentication(accessToken);
             User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -203,7 +272,6 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
             // 토큰 생성
             String reissueAccessToken = jwtUtil.createJwt("access", id, jwtUtil.ACCESS_TOKEN_EXPIRATION);    // 24시간
             // String refreshToken = jwtUtil.createJwt("refresh", id, jwtUtil.REFRESH_TOKEN_EXPIRATION); // 24시간
-
 
 
             //  Redis에 access 토큰 정보 확인 및 블랙리스트 등록
@@ -230,7 +298,7 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
             refreshRepository.save(existingToken);
             // 응답 설정
             res.setHeader("Authorization", "Bearer " + reissueAccessToken); // 키 값이 같을시,  내용을 덮어씌움
-            // res.addHeader(HttpHeaders.SET_COOKIE, CookieUtil.createCookie("reissue_access", reissueAccessToken, CookieUtil.ACCESS_COOKIE_EXPIRATION).toString()); // 키 값이 같을 시, 내용을 추가
+            res.addHeader(HttpHeaders.SET_COOKIE, CookieUtil.createCookie("reissue_access", reissueAccessToken, CookieUtil.ACCESS_COOKIE_EXPIRATION, req).toString()); // 키 값이 같을 시, 내용을 추가
             return true;
         } else {
             System.out.println("재 로그인 필요");
@@ -239,9 +307,12 @@ public class UserServiceImpl extends DefaultOAuth2UserService implements UserSer
 
     }
 
+    /**
+     * 유저 Id 찾기
+     */
     @Override
     public User findById(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_EXIST));
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_EXIST));
     }
 }

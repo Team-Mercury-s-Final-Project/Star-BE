@@ -68,18 +68,19 @@ public class Timer {
 //        this.studyDate = LocalDate.now(); Start 시, Date 비교하고 1일 1 Timer로 저장
     }
 
-    /*
-     Status가 start 일시, 현재까지의 공부 시간 계산( 실시간으로 업데이트 하지 않기 때문. )
+    /**
+     * Status가 start 일시, 현재까지의 공부 시간 계산
+     * 현재 start 시, startTime만 기록하고 TimeSoFar을 실시간으로 업데이트 하지 않기 때문.
+     * @Param LocalDateTime.now()만 사용할 것.
+     * @Return : 밀리초 단위, 기존 공부 시간+시작 시점부터 현재까지의 공부 시간
      */
-    public Long getCalculatedTimeSoFarWhenStatusIsStart() {
+    public Long getMilliSecondTimeSoFarFromStartTimeTo(LocalDateTime now) {
         if (this.status != TimerStatus.START) {
-            return timeSoFar;
+            return timeSoFar*1000;
         }
-        System.out.println(" 내 닉네임 :" + user.getNickname());
-        System.out.println(" 현재 시각 : "+LocalDateTime.now());
-        System.out.println(" 시작 시각 : "+startTime);
-        System.out.println(" 공부 시간 : "+Duration.between(startTime, LocalDateTime.now()).getSeconds());
-        return timeSoFar + Duration.between(startTime, LocalDateTime.now()).getSeconds();
+        // 마지막 이벤트로부터 저장 된 경과 시간 + 현재 시간 - 시작 시간
+        Duration timeOffset = Duration.between(startTime, now);
+        return timeSoFar*1000 + timeOffset.toMillis();
     }
 
     /**
@@ -169,7 +170,7 @@ public class Timer {
             case START:
                 timerEventDto.setEvent(TimerEvent.START);
                 timerEventDto.setStatus(TimerStatus.START.toString());
-                timerEventDto.setTimeSoFar(this.getCalculatedTimeSoFarWhenStatusIsStart());
+                timerEventDto.setCurrentTimeSoFar(this);
                 break;
             case STOP:
                 timerEventDto.setEvent(TimerEvent.STOP);

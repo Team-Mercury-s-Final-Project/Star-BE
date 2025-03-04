@@ -24,6 +24,7 @@ public class ChatController {
 
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
+
     /**
      * 채팅방 조회 컨트롤러
      * */
@@ -277,9 +278,4 @@ public class ChatController {
         boolean isReadCheck = chatService.isReadCheck(chatReadRequest);
         return ApiResponse.success(isReadCheck);
     }
-
-    //사용자 차단
-    //사용자 차단 해제
-    //차단 사용자 목록
-
 }
