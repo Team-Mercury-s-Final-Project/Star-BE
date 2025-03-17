@@ -1,10 +1,13 @@
 package com.mercury.star_be.studygroup.service;
 
+import static com.mercury.star_be.global.config.RabbitMQConfig.*;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -13,6 +16,7 @@ import com.mercury.star_be.chat.repository.ChatRoomRepository;
 import com.mercury.star_be.global.error.BusinessException;
 import com.mercury.star_be.global.error.code.ChatErrorCode;
 import com.mercury.star_be.studygroup.dto.GroupMemberDto;
+import com.mercury.star_be.studygroup.dto.SseQueueMessage;
 import com.mercury.star_be.studygroup.dto.response.GroupMemberSseResponse;
 import com.mercury.star_be.studygroup.dto.response.MemberStatusSseResponse;
 import com.mercury.star_be.studygroup.entity.ConnectionStatus;
@@ -28,6 +32,7 @@ public class StudyGroupSseServiceImpl implements StudyGroupSseService {
 	private final SseEmitterRepository sseEmitterRepository;
 	private final GroupMemberRepository groupMemberRepository;
 	private final ChatRoomRepository chatRoomRepository;
+	private final RabbitTemplate rabbitTemplate;
 
 	private static final Long SSE_TIMEOUT = 60 * 60 * 1000L;	// 1시간
 	private static final String CONNECT_EVENT = "connect";
@@ -75,7 +80,8 @@ public class StudyGroupSseServiceImpl implements StudyGroupSseService {
 			.userId(userId)
 			.status(ConnectionStatus.OFFLINE)
 			.build();
-		sendToGroup(groupId, STATUS_UPDATE_EVENT, memberStatusSseResponse);
+		SseQueueMessage message = new SseQueueMessage(groupId, STATUS_UPDATE_EVENT, memberStatusSseResponse);
+		rabbitTemplate.convertAndSend(SSE_EXCHANGE_NAME, "", message);
 	}
 
 	private void sendGroupMemberInfoList(Long groupId, SseEmitter sseEmitter) {
@@ -106,20 +112,22 @@ public class StudyGroupSseServiceImpl implements StudyGroupSseService {
 
 	@Override
 	public void sendFocusRoomMemberCountToGroup(Long groupId, int memberCount) {
-		sendToGroup(groupId, FOCUS_ROOM_MEMBER_COUNT_EVENT, memberCount);
+		SseQueueMessage message = new SseQueueMessage(groupId, FOCUS_ROOM_MEMBER_COUNT_EVENT, memberCount);
+		rabbitTemplate.convertAndSend(SSE_EXCHANGE_NAME, "", message);
 	}
 
-	public void sendFocusRoomMemberCount(Long groupId, SseEmitter sseEmitter) {
+	private void sendFocusRoomMemberCount(Long groupId, SseEmitter sseEmitter) {
 		int focusRoomMemberCount = sseEmitterRepository.getFocusRoomMemberCount(groupId);
 		sendData(sseEmitter, FOCUS_ROOM_MEMBER_COUNT_EVENT, focusRoomMemberCount);
 	}
 
 	@Override
 	public void sendChatRoomMemberCountToGroup(Long groupId, int memberCount) {
-		sendToGroup(groupId, CHAT_ROOM_MEMBER_COUNT_EVENT, memberCount);
+		SseQueueMessage message = new SseQueueMessage(groupId, CHAT_ROOM_MEMBER_COUNT_EVENT, memberCount);
+		rabbitTemplate.convertAndSend(SSE_EXCHANGE_NAME, "", message);
 	}
 
-	public void sendChatRoomMemberCount(Long groupId, SseEmitter sseEmitter) {
+	private void sendChatRoomMemberCount(Long groupId, SseEmitter sseEmitter) {
 		ChatRoom chatRoom = chatRoomRepository.findByStudyGroupId(groupId)
 			.orElseThrow(() -> new BusinessException(ChatErrorCode.CHAT_ROOM_NOT_FOUND));
 		int chatRoomMemberCount = sseEmitterRepository.getChatRoomMemberCount(chatRoom.getId());
@@ -133,16 +141,19 @@ public class StudyGroupSseServiceImpl implements StudyGroupSseService {
 			.userId(userId)
 			.status(status)
 			.build();
-		sendToGroup(groupId, STATUS_UPDATE_EVENT, memberStatusSseResponse);
+		SseQueueMessage message = new SseQueueMessage(groupId, STATUS_UPDATE_EVENT, memberStatusSseResponse);
+		rabbitTemplate.convertAndSend(SSE_EXCHANGE_NAME, "", message);
 	}
 
 	@Override
 	public void sendGroupMemberInfoToGroup(Long groupId) {
 		List<GroupMemberSseResponse> groupMemberInfoList = getGroupMemberInfoList(groupId);
-		sendToGroup(groupId, MEMBER_DATA_EVENT, groupMemberInfoList);
+		SseQueueMessage message = new SseQueueMessage(groupId, MEMBER_DATA_EVENT, groupMemberInfoList);
+		rabbitTemplate.convertAndSend(SSE_EXCHANGE_NAME, "", message);
 	}
 
-	private void sendToGroup(Long groupId, String eventName, Object data) {
+	@Override
+	public void sendToGroup(Long groupId, String eventName, Object data) {
 		Map<Long, SseEmitter> groupSseEmitters = sseEmitterRepository.findAllByGroupId(groupId);
 		groupSseEmitters.forEach((userId, sseEmitter) -> {
 			if (sseEmitter != null) {

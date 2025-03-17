@@ -56,9 +56,6 @@ public class WebSocketEventListener {
     // 세션 종료 이벤트 (클라이언트가 종료 요청을 보내지 못한 경우 예외처리)
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         activeUsers.decrementAndGet();
-        System.out.println("사용자 연결 해제됨. 현재 연결된 사용자 수: " + activeUsers.get());
-        System.out.println("종료 세션 id "+event.getSessionId());
-        System.out.println("세션 속성들 조회 "+event);
         handleTimerDisconnection(event);
     }
 
@@ -77,18 +74,16 @@ public class WebSocketEventListener {
             String[] split = groupIdAndUserIdAndNickname.iterator().next().split(":");
             long groupId = Long.parseLong(split[0]);
             long userId = Long.parseLong(split[1]);
-            String nickname = split[2];
-
-            log.info("disconnect groupId: {} userId: {} nickname : {}", groupId, userId,nickname);
+            long groupMemberId = Long.parseLong(split[2]);
+            String nickname = split[3];
 
             // 타이머 정지 처리
-            System.out.println("sessionId: " + event.getSessionId());
-            timerService.stopTimerByGroupIdAndUserId(groupId, userId);
+            timerService.stopTimerByGroupMemberId(groupMemberId);
 
             // Redis에서 삭제
-            Long delete = redisTemplate.opsForSet().remove("focus:"+sessionId,groupId+":"+userId+":"+nickname);// 세션id 제거
-            Long removeCUser = redisTemplate.opsForSet().remove("focus:" + groupId, userId + ":" + nickname);
-            log.info("Remove session(T/F) and user : {} and {}",delete,removeCUser);
+            redisTemplate.opsForSet().remove("focus:"+sessionId,groupId+":"+userId+":"+groupMemberId+":"+nickname);// 세션id 제거
+            redisTemplate.opsForSet().remove("focus:" + groupId, groupMemberId + ":" + nickname);
+
 
             // Disconnection 브로드캐스트
             TimerDto disconnectEvent = new TimerDto();
@@ -98,7 +93,6 @@ public class WebSocketEventListener {
                     "/topic/groups."+groupId+".timers",
                     disconnectEvent
             );
-            System.out.println("타이머 종료 이벤트 브로드캐스트 완료");
 
             // SSE: 집중방 Disconnect 시 현재 인원수 send
             int focusRoomMemberCount = redisTemplate.opsForSet().members("focus:" + groupId).size();
@@ -113,37 +107,28 @@ public class WebSocketEventListener {
      * @param headerAccessor
      */
     private void handleFocusRoomConnection(StompHeaderAccessor headerAccessor) {
-        // 헤더에서 groupId와 userId 추출 닉네임도 추출 -db or client에서 가져옴
+        // groupId : 집중방 구분.
         String groupId = headerAccessor.getFirstNativeHeader("groupId");
+
+        // groupId: 집중방 특정 접속자, 타이머 stop을 위해 저장.
+        String groupMemberId = headerAccessor.getFirstNativeHeader("groupMemberId");
+
+        // userId: Disconnect 시, SSE 구분
         String userId = headerAccessor.getFirstNativeHeader("userId");
 
-        //TODO 그룹 멤버 닉네임으로 필요함...
+        // nickname redis 캐시해놓으면 groupMember join 필요 없음.
         String nickname = headerAccessor.getFirstNativeHeader("nickname");
-        log.info("chekc nickname: {}", nickname);
-        /*
-            // JWT 토큰을 이용한 사용자 정보 조회인데 현재 토큰 없이 connect 해서 오류 발생
-            필터 적용은 가능하나 사용 불가 csrf 비활성 불가능함
-            : EnableWebSecurity 설정으로 인해 필터 적용가능 csrf 비활성화 불가능
-            UserResponse userResponse = UserResponse.getAuthenticatedUser();
-            if (userResponse != null) {
-                System.out.println("UserResponse: " + userResponse);
-                userId = userResponse.getId().toString();
-                nickname = userResponse.getNickname();
-            }
-         */
-
-        System.out.println("Checking headers: groupId " + groupId + " uid: " + userId + " nick: " + nickname);
 
         // focus 방일 경우만 처리 - focus 방은 참여 인원 Redis에 저장
         // disconnect 용 세션id 필요. 하지만 sid로 접속 유저 체크 불가.
-        if (groupId != null && userId != null) {
+        if (userId != null && groupMemberId != null) {
             String redisKey = "focus:" + groupId;
             SetOperations<String, String> setOps = redisTemplate.opsForSet();
 
             // 세션 id 저장 (세션 종료 시, Redis에서 제거하고 timer도 종료 : groupId, userId로 조회)
             String sessionId = headerAccessor.getSessionId();
             if (sessionId != null) {
-                setOps.add("focus:"+sessionId, groupId+":"+userId+":"+nickname);
+                setOps.add("focus:"+sessionId, groupId+":"+userId+":"+groupMemberId+":"+nickname);
                 Boolean expire = redisTemplate.expire("focus:"+sessionId, Duration.ofDays(1));
             }else {
                 // 세션 아이디가 없을 경우 예외 처리
@@ -152,22 +137,21 @@ public class WebSocketEventListener {
             }
 
             // Redis에 유저 추가
-            setOps.add(redisKey, userId+":"+nickname);
+            setOps.add(redisKey, groupMemberId+":"+nickname);
 
             // TTL 설정
             redisTemplate.expire(redisKey, Duration.ofDays(1));
 
-            System.out.println("User " + userId + " joined group 리스너" + groupId);
-
             // Entry 이벤트 브로드캐스트 객체
             // 가장 최신 timer 객체 불러오기
-            TimerDto entryEvent = timerService.getMyTimerByGroupIdAndUserId(Long.parseLong(groupId), Long.parseLong(userId));
+            TimerDto entryEvent = timerService.getMyRecentTimerByGroupMemberId(Long.parseLong(groupMemberId));
+
             // 타이머가 없는 경우, 새로 입장한 사용자임. Entry 이벤트 객체 생성
             if (entryEvent == null) {
-                System.out.println("타이머 없음 새로 입장~");
                 entryEvent = new TimerDto();
                 entryEvent.setEvent(TimerEvent.ENTRY);
                 entryEvent.setUserId(Long.parseLong(userId));
+                entryEvent.setGroupMemberId(Long.parseLong(groupMemberId));
                 entryEvent.setNickname(nickname);
                 entryEvent.setTimeSoFar(0);
                 entryEvent.setStatus("REST");

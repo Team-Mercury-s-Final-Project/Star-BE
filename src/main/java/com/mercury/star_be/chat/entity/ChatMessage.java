@@ -2,6 +2,7 @@ package com.mercury.star_be.chat.entity;
 
 import com.mercury.star_be.user.entity.User;
 import jakarta.persistence.*;
+import jakarta.transaction.Transactional;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

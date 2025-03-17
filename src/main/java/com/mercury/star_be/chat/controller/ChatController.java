@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChatController {
 
     private final ChatService chatService;
+
     /**
      * 채팅방 조회 컨트롤러
      * */
@@ -113,12 +114,13 @@ public class ChatController {
     /**채팅방 내 메시지 읽음 udpate 컨트롤러*/
     @MessageMapping("/readCheck/{chatRoomId}")
     @SendTo("/topic/readCheck.{chatRoomId}")
-    public void updateReadUsers(
+    public ApiResponse<ChatReadResponse> updateReadUsers(
             @DestinationVariable
             Long chatRoomId,
             @Payload ChatReadRequest chatReadRequest
     ){
-        chatService.updateReadCount(chatReadRequest, chatRoomId);
+        ChatReadResponse response = chatService.updateReadCount(chatReadRequest, chatRoomId);
+        return ApiResponse.success(response);
     }
     /**현재 접속한 사용자 반환*/
     @MessageMapping("/chat/connect/{chatRoomId}")
@@ -232,7 +234,9 @@ public class ChatController {
     public ApiResponse<ChatRoomJoinResponse> joinChatRoom(
             @PathVariable Long groupId
     ){
-        ChatRoomJoinResponse chatRoomJoinResponse = chatService.joinChatRoom(groupId);
+        UserResponse userResponse =
+            (UserResponse) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        ChatRoomJoinResponse chatRoomJoinResponse = chatService.joinChatRoom(groupId, userResponse.getId());
         return ApiResponse.success(chatRoomJoinResponse);
     }
 
@@ -266,9 +270,4 @@ public class ChatController {
         boolean isReadCheck = chatService.isReadCheck(chatReadRequest);
         return ApiResponse.success(isReadCheck);
     }
-
-    //사용자 차단
-    //사용자 차단 해제
-    //차단 사용자 목록
-
 }

@@ -1,10 +1,9 @@
 package com.mercury.star_be.timer.entity;
 
-import com.mercury.star_be.studygroup.entity.StudyGroup;
+import com.mercury.star_be.studygroup.entity.GroupMember;
 import com.mercury.star_be.timer.dto.TimerDto;
 import com.mercury.star_be.timer.dto.TimerEvent;
 import com.mercury.star_be.timer.enums.TimerStatus;
-import com.mercury.star_be.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +14,9 @@ import lombok.ToString;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Entity
 @Getter
 @NoArgsConstructor
@@ -42,23 +43,18 @@ public class Timer {
     private LocalDateTime createdAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "study_group_id")
-    private StudyGroup studyGroup;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
+    @JoinColumn(name = "group_member_id")
+    private GroupMember groupMember;
 
     @Builder
     public Timer(Long id, TimerStatus status, LocalDateTime startTime, LocalDateTime endTime,
-        LocalDate studyDate, StudyGroup studyGroup, User user) {
+        LocalDate studyDate, GroupMember groupMember) {
         this.id = id;
         this.status = status;
         this.startTime = startTime;
         this.endTime = endTime;
         this.studyDate = studyDate;
-        this.studyGroup = studyGroup;
-        this.user = user;
+        this.groupMember = groupMember;
     }
 
     public void start() {
@@ -68,18 +64,19 @@ public class Timer {
 //        this.studyDate = LocalDate.now(); Start 시, Date 비교하고 1일 1 Timer로 저장
     }
 
-    /*
-     Status가 start 일시, 현재까지의 공부 시간 계산( 실시간으로 업데이트 하지 않기 때문. )
+    /**
+     * Status가 start 일시, 현재까지의 공부 시간 계산
+     * 현재 start 시, startTime만 기록하고 TimeSoFar을 실시간으로 업데이트 하지 않기 때문.
+     * @Param LocalDateTime.now()만 사용할 것.
+     * @Return : 밀리초 단위, 기존 공부 시간+시작 시점부터 현재까지의 공부 시간
      */
-    public Long getCalculatedTimeSoFarWhenStatusIsStart() {
+    public Long getMilliSecondTimeSoFarFromStartTimeTo(LocalDateTime now) {
         if (this.status != TimerStatus.START) {
-            return timeSoFar;
+            return timeSoFar*1000;
         }
-        System.out.println(" 내 닉네임 :" + user.getNickname());
-        System.out.println(" 현재 시각 : "+LocalDateTime.now());
-        System.out.println(" 시작 시각 : "+startTime);
-        System.out.println(" 공부 시간 : "+Duration.between(startTime, LocalDateTime.now()).getSeconds());
-        return timeSoFar + Duration.between(startTime, LocalDateTime.now()).getSeconds();
+        // 마지막 이벤트로부터 저장 된 경과 시간 + 현재 시간 - 시작 시간
+        Duration timeOffset = Duration.between(startTime, now);
+        return timeSoFar*1000 + timeOffset.toMillis();
     }
 
     /**
@@ -148,10 +145,12 @@ public class Timer {
         timeSoFar = 0L;
     }
 
-    public Long getUserId() {
-        return user.getId();
+    public Long getGroupMemberId() {
+        return groupMember.getId();
     }
-
+    public Long getUserId() {
+        return groupMember.getMember().getId();
+    }
     /**
      * 자정 이후의 초과한 공부 시간을 새로운 타이머에 저장
      */
@@ -169,7 +168,7 @@ public class Timer {
             case START:
                 timerEventDto.setEvent(TimerEvent.START);
                 timerEventDto.setStatus(TimerStatus.START.toString());
-                timerEventDto.setTimeSoFar(this.getCalculatedTimeSoFarWhenStatusIsStart());
+                timerEventDto.setCurrentTimeSoFar(this);
                 break;
             case STOP:
                 timerEventDto.setEvent(TimerEvent.STOP);
@@ -185,10 +184,19 @@ public class Timer {
             case ENTRY:
                 timerEventDto.setEvent(TimerEvent.ENTRY);
                 timerEventDto.setStatus(TimerStatus.REST.toString());
-                System.out.println("입장 시, time 확인 timer.java"+this.getTimeSoFar());
                 break;
         }
         return timerEventDto;
     }
+
+    public String getNickname() {
+        String nickname = groupMember.getNickname();
+        if (nickname.isEmpty()){
+            log.error("Can not find nickName:Timer.java.getNickName");
+            return "NoNickName";
+        }
+        return groupMember.getNickname();
+    }
+
 
 }

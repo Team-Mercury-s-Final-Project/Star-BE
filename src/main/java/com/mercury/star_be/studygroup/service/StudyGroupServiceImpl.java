@@ -202,33 +202,13 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 
 	@Override
 	@Transactional
-	public void joinStudyGroup(Long groupId, Long userId, String password) throws BusinessException {
-
+	public void joinStudyGroup(Long groupId, Long userId, String password) {
 		User user = userRepository.findById(userId)
 			.orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_EXIST));
 
-		// 가입하려는 그룹이 존재하지 체크
-		StudyGroup studyGroup = studyGroupRepository.findById(groupId)
-			.orElseThrow(() -> new BusinessException(StudyGroupErrorCode.STUDY_GROUP_NOT_FOUND));
-
-		// 가입하려는 그룹이 다 찼을때
-		if (studyGroup.getMemberCount() >= studyGroup.getMaxCapacity()) {
-			throw new BusinessException(StudyGroupErrorCode.STUDY_GROUP_IS_FULL);
-		}
-
-		// 그룹이 비밀번호로 보호되어 있는지 체크하고,
-		// 보호되어 있다면, 전달된 password와 일치하는지 검증
-		if (studyGroup.hasPassword()) {
-			if (password == null || !studyGroup.getPassword().equals(password)) {
-				throw new BusinessException(StudyGroupErrorCode.INVALID_GROUP_PASSWORD);
-			}
-		}
-
-		// 가입하려는 그룹에 이미 유저가 가입한 상태일때
-		boolean isAlreadyJoined = groupMemberRepository.existsByGroupIdAndMemberId(studyGroup.getId(), user.getId());
-		if (isAlreadyJoined) {
-			throw new BusinessException(StudyGroupErrorCode.USER_ALREADY_EXIST_IN_GROUP);
-		}
+		StudyGroup studyGroup = findById(groupId);
+		// 그룹 가입 여부, 인원 수, 비밀번호 검증
+		validateStudyGroupJoin(studyGroup, user.getId(), password);
 
 		// 그룹에 유저 추가
 		GroupMember groupMember = GroupMember.builder()
@@ -238,24 +218,40 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 			.nickname(user.getNickname())
 			.joinedAt(LocalDateTime.now())
 			.build();
+		int updatedRows = studyGroupRepository.increaseMemberCount(groupId);
+		if (updatedRows == 0) {
+			throw new BusinessException(StudyGroupErrorCode.STUDY_GROUP_IS_FULL);
+		}
 		studyGroup.addMember(groupMember);
 
 		// 그룹채팅방 가입
-		chatService.joinChatRoom(groupId);
+		chatService.joinChatRoom(groupId, userId);
 
 		// SSE: 전체 그룹원 정보 send
 		studyGroupSseService.sendGroupMemberInfoToGroup(groupId);
 	}
 
+	private void validateStudyGroupJoin(StudyGroup studyGroup, Long userId, String password) {
+		// 가입하려는 그룹에 이미 유저가 가입한 상태일때
+		boolean isAlreadyJoined = groupMemberRepository.existsByGroupIdAndMemberId(studyGroup.getId(), userId);
+		if (isAlreadyJoined) {
+			throw new BusinessException(StudyGroupErrorCode.USER_ALREADY_EXIST_IN_GROUP);
+		}
+
+		// 그룹이 비밀번호로 보호되어 있다면 전달된 password와 일치하는지 검증
+		if (!studyGroup.isPasswordCorrect(password)) {
+			throw new BusinessException(StudyGroupErrorCode.INVALID_GROUP_PASSWORD);
+		}
+	}
+
 	@Override
 	@Transactional
-	public void exitStudyGroup(Long groupId, Long userId) throws BusinessException {
-		// 그룹이 존재하는지
-		StudyGroup studyGroup = studyGroupRepository.findById(groupId)
-			.orElseThrow(() -> new BusinessException(StudyGroupErrorCode.STUDY_GROUP_NOT_FOUND));
+	public void exitStudyGroup(Long groupId, Long userId) {
+		StudyGroup studyGroup = findById(groupId);
 		// 탈퇴하려는 사람이 그룹에 존재하는지
 		GroupMember groupMember = groupMemberRepository.findByGroupIdAndMemberId(groupId, userId)
 			.orElseThrow(() -> new BusinessException(StudyGroupErrorCode.USER_NOT_EXIST_IN_GROUP));
+
 		// 그룹의 멤버가 1명만 남아 있는 경우 (호스트 == 마지막 유저)
 		if (studyGroup.getMemberCount() == 1) {
 			// 그룹 삭제
@@ -285,14 +281,17 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 	}
 
 	@Override
-	public void simpleExitStudyGroup(String token) throws BusinessException {
+	public void simpleExitStudyGroup(String token) {
 		Long userId = jwtUtil.getId(token);
 		List<Long> groupIdList = groupMemberRepository.findGroupIdsByMemberId(userId);
 		for (Long groupId : groupIdList) {
-			StudyGroup studyGroup = studyGroupRepository.findById(groupId)
-					.orElseThrow(() -> new BusinessException(StudyGroupErrorCode.STUDY_GROUP_NOT_FOUND));
+			StudyGroup studyGroup = findById(groupId);
 			// 그룹의 멤버가 1명만 남아 있는 경우 (호스트 == 마지막 유저)
-			if (studyGroup.getMemberCount() == 1) studyGroupRepository.delete(studyGroup);
+			if (studyGroup.getMemberCount() == 1) {
+				studyGroupRepository.delete(studyGroup);
+				return;
+			}
+
 			// 그룹 멤버 관계 삭제
 			groupMemberRepository.deleteByGroupIdAndMemberId(groupId, userId);
 			studyGroup.decrementMemberCount();
@@ -307,7 +306,7 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 
 	@Override
 	@Transactional
-	public void selectHost(Long groupId, Long MemberId) throws BusinessException {
+	public void selectHost(Long groupId, Long MemberId) {
 
 		GroupMember newHost = groupMemberRepository.findByGroupIdAndMemberId(groupId, MemberId)
 						.orElseThrow(() -> new BusinessException(StudyGroupErrorCode.STUDY_GROUP_IS_EMPTY));
@@ -351,10 +350,6 @@ public class StudyGroupServiceImpl implements StudyGroupService {
 
 	@Override
 	public List<MyStudyGroupListResponse> getMyStudyGroupList(Long userId) {
-		// myUserId 를 통해 GroupMember 에서 내가 가입한 그룹을 찾는다...?
-		// query select  group_id from group_member where member_id = 20;
-		// 결과를 리스트로 받고
-		// StudyGroups 에서 group_id 를 통해 가져오는 정보를 builder 사용해서 MyStudyGroupListResponse 에 넣어준다....?
 		List<MyStudyGroupListResponse> myStudyGroupListResponses = studyGroupRepository.findMyStudyGroupList(userId);
 		return myStudyGroupListResponses;
 	}

@@ -6,8 +6,6 @@ import com.mercury.star_be.studygroup.entity.StudyGroup;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
-import com.querydsl.core.types.dsl.PathBuilder;
-import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -18,7 +16,7 @@ import java.util.List;
 import static com.mercury.star_be.studygroup.entity.QGroupMember.groupMember;
 import static com.mercury.star_be.studygroup.entity.QStudyGroup.studyGroup;
 
-public class StudyGroupCustomRepositoryImpl implements StudyGroupCustomRepository{
+public class StudyGroupCustomRepositoryImpl implements StudyGroupCustomRepository {
     private final JPAQueryFactory jpaQueryFactory;
 
     public StudyGroupCustomRepositoryImpl(JPAQueryFactory jpaQueryFactory) {

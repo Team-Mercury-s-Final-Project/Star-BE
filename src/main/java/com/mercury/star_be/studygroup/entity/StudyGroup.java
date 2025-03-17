@@ -17,7 +17,6 @@ import jakarta.persistence.OneToMany;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.transaction.annotation.Transactional;
 
 @Getter
 @NoArgsConstructor
@@ -49,9 +48,6 @@ public class StudyGroup {
 	@OneToMany(mappedBy = "studyGroup", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<ChatRoom> chatRooms = new ArrayList<>();
 
-	@OneToMany(mappedBy = "studyGroup", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<Timer> timers = new ArrayList<>();
-
 	@Builder
 	public StudyGroup(String name, String description, String image, int maxCapacity, int memberCount, boolean isPublic,
 		boolean hasPassword, String password, LocalDateTime createdAt) {
@@ -81,17 +77,22 @@ public class StudyGroup {
 		return hasPassword;
 	}
 
-	@Transactional
-	public void addMember (GroupMember member){
+	public void addMember(GroupMember member) {
 		members.add(member);
-		this.memberCount++;
 	}
-	@Transactional
+
 	public void addNotice (Notice notice) {
 		notices.add(notice);
 	}
 
 	public void decrementMemberCount() {
 		this.memberCount = Math.max(this.memberCount - 1, 0);
+	}
+
+	public boolean isPasswordCorrect(String password) {
+		if (hasPassword) {
+			return this.password.equals(password);
+		}
+		return true;
 	}
 }

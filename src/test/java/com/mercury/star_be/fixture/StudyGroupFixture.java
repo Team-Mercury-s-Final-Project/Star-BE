@@ -6,6 +6,16 @@ import java.time.LocalDateTime;
 
 public class StudyGroupFixture {
 
+    public static StudyGroup createStudyGroup(String name, int maxCapacity) {
+        return StudyGroup.builder()
+            .name(name)
+            .maxCapacity(maxCapacity)
+            .isPublic(true)
+            .hasPassword(false)
+            .memberCount(1)
+            .build();
+    }
+
     public static StudyGroup createStudyGroup(
             String name,
             String description,

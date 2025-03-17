@@ -1,17 +1,13 @@
-package com.mercury.star_be.timer.controller;
+package com.mercury.star_be.timer.service;
 
 import com.mercury.star_be.timer.dto.TimerRankingPeriod;
 import com.mercury.star_be.timer.dto.TimerRankingResponseDto;
 import com.mercury.star_be.timer.repository.TimerRankingRepository;
-import com.mercury.star_be.timer.service.TimerRankingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

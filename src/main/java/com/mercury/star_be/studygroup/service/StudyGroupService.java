@@ -29,13 +29,13 @@ public interface StudyGroupService {
 	PaginationResponse<StudyGroupListResponse> getStudyGroupList(String keyword, String sort, String direction,
 		int page);
 
-	void joinStudyGroup(Long groupId, Long userId, String password) throws BusinessException;
+	void joinStudyGroup(Long groupId, Long userId, String password);
 
-	void simpleExitStudyGroup(String token) throws BusinessException;
+	void simpleExitStudyGroup(String token);
 
-	void selectHost(Long groupId, Long MemberId) throws BusinessException;
+	void selectHost(Long groupId, Long MemberId);
 
-	void exitStudyGroup(Long groupId, Long userId) throws BusinessException;
+	void exitStudyGroup(Long groupId, Long userId);
 
 	void changeHost(Long groupId, Long userId, Long newHostId);
 

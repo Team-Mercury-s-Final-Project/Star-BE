@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class TimerRankingResponseDto {
 
-    private Long userId;
+    private Long groupMemberId;
     private String image;
     private String nickname;
     private BigDecimal totalTime;

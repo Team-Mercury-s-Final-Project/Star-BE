@@ -3,11 +3,11 @@ package com.mercury.star_be.timer.controller;
 import com.mercury.star_be.global.common.ApiResponse;
 import com.mercury.star_be.timer.dto.TimerRankingPeriod;
 import com.mercury.star_be.timer.dto.TimerRankingResponseDto;
+import com.mercury.star_be.timer.service.TimerRankingServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/timers/ranking")

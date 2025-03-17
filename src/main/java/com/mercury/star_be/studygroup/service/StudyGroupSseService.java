@@ -15,4 +15,6 @@ public interface StudyGroupSseService {
 	void sendMemberStatusToGroup(Long groupId, Long userId, ConnectionStatus status);
 
 	void sendGroupMemberInfoToGroup(Long groupId);
+
+	void sendToGroup(Long groupId, String eventName, Object data);
 }

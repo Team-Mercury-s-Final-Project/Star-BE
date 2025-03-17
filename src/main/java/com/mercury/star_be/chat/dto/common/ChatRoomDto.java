@@ -22,4 +22,5 @@ public class ChatRoomDto {
     private List<Long> unreadMessages; //채팅방에서 읽지 않은 메시지들 id list
     private ChatRecentMessageDto recentMessage;
     private String chatRoomName;
+    private String chatRoomImage;
 }

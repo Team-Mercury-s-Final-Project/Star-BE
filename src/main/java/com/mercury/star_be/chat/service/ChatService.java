@@ -33,13 +33,13 @@ public interface ChatService {
     ChatMessageCountCkResponse findChatMessageRecord(Long senderId, Long receiverId);
     ChatMessageCountCkResponse findChatMessageRecordForGroup(Long groupId);
     //그룹채팅 가입
-    ChatRoomJoinResponse joinChatRoom(Long groupId);
+    ChatRoomJoinResponse joinChatRoom(Long groupId, Long userId);
     //사용자 채팅방 조회(사용자 아이디, 채팅방 아이디)
     boolean isJoinedChatRoom(Long chatUserId, Long chatRoomId);
     //채팅방 id를 받아 List<ChatRoomMemberDto>로 return
     List<ChatRoomMemberDto> getChatRoomMembers(ChatRoom chatRoom);
     //읽음 update
-    void updateReadCount(ChatReadRequest chatReadRequest, Long chatRoomId);
+    ChatReadResponse updateReadCount(ChatReadRequest chatReadRequest, Long chatRoomId);
     //사용자가 채팅방에서 읽지 않은 메시지들의 아이디 리스트
     List<Long> findUnreadMessageIds(Long chatRoomId, Long userId);
     //읽지 않은 메시지들의 아이디 리스트를 받아  메시지 읽음 테이블에 insert / 메시지 테이블에 update
